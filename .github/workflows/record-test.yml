@@ -1,0 +1,59 @@
+name: Record Full Installer Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      play_wait_seconds:
+        description: "Seconds to let the video/roast screen run before auto-pressing ESC"
+        default: "45"
+
+jobs:
+  record:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout test-runner repo (driver script)
+        uses: actions/checkout@v4
+        with:
+          path: gta-sa-test-runner
+
+      - name: Checkout installer repo (untouched)
+        uses: actions/checkout@v4
+        with:
+          repository: TheLightPhoenix98/gta-sa-definitely-legit
+          path: gta-sa-definitely-legit
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r gta-sa-definitely-legit/requirements.txt
+          pip install pyautogui
+
+      - name: Start screen recording
+        shell: pwsh
+        run: |
+          $wait = [int]"${{ github.event.inputs.play_wait_seconds }}"
+          $duration = $wait + 40
+          Start-Process ffmpeg -ArgumentList "-y -f gdigrab -framerate 15 -i desktop -t $duration -pix_fmt yuv420p demo.mp4"
+          Start-Sleep -Seconds 1
+
+      - name: Run full test (wizard, then video + roast)
+        shell: pwsh
+        env:
+          PLAY_WAIT_SECONDS: ${{ github.event.inputs.play_wait_seconds }}
+        run: python gta-sa-test-runner/scripts/run_full_test.py
+
+      - name: Wait for recording to finish
+        shell: pwsh
+        run: Wait-Process -Name ffmpeg -ErrorAction SilentlyContinue
+
+      - name: Upload recording
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-installer-demo
+          path: demo.mp4
