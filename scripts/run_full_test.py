@@ -17,7 +17,7 @@ PLAY_WAIT_SECONDS = int(os.environ.get("PLAY_WAIT_SECONDS", "45"))
 # if anything gets stuck for any reason (COM error, unfocused window
 # eating the escape key, whatever) this kills the process outright so
 # the CI job can never hang forever like it did last time
-HARD_TIMEOUT_SECONDS = PLAY_WAIT_SECONDS + 90
+HARD_TIMEOUT_SECONDS = PLAY_WAIT_SECONDS + 30
 
 
 def start_watchdog():
@@ -76,17 +76,20 @@ def run_wizard_phase():
 
 
 def run_play_phase():
-    import pyautogui
+    import tkinter
 
-    def send_escape_later():
-        time.sleep(PLAY_WAIT_SECONDS)
-        # press it a few times a couple seconds apart in case the window
-        # wasn't focused yet on the first attempt
-        for _ in range(3):
-            pyautogui.press("esc")
-            time.sleep(2)
+    # instead of trying to simulate a real OS-level ESC keypress (which
+    # needs the window to actually have OS focus - unreliable on a CI
+    # runner's session), we schedule the window to close itself via
+    # Tkinter's own .after() timer. that runs on the same thread as
+    # mainloop() so it always fires, focus or no focus.
+    original_tk_init = tkinter.Tk.__init__
 
-    threading.Thread(target=send_escape_later, daemon=True).start()
+    def patched_init(self, *args, **kwargs):
+        original_tk_init(self, *args, **kwargs)
+        self.after(PLAY_WAIT_SECONDS * 1000, self.destroy)
+
+    tkinter.Tk.__init__ = patched_init
 
     from player import run_player
     run_player()
@@ -95,11 +98,11 @@ def run_play_phase():
 if __name__ == "__main__":
     start_watchdog()
 
-    print("Phase 1: wizard")
+    print("Phase 1: wizard", flush=True)
     run_wizard_phase()
 
-    print("Phase 2: play + roast")
+    print("Phase 2: play + roast", flush=True)
     run_play_phase()
 
-    print("Done")
+    print("Done", flush=True)
     os._exit(0)
