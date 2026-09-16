@@ -10,6 +10,7 @@ on:
 jobs:
   record:
     runs-on: windows-latest
+    timeout-minutes: 8
 
     steps:
       - name: Checkout test-runner repo (driver script)
