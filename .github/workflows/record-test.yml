@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       play_wait_seconds:
-        description: "Seconds to let the video/roast screen run before auto-pressing ESC"
-        default: "45"
+        description: "Seconds to let the video/roast screen run before it auto-closes"
+        default: "150"
 
 jobs:
   record:
@@ -28,6 +28,87 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Switch runner to dark mode
+        shell: pwsh
+        run: |
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+          Set-ItemProperty -Path $key -Name "AppsUseLightTheme" -Value 0
+          Set-ItemProperty -Path $key -Name "SystemUsesLightTheme" -Value 0
+          Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          Start-Process explorer.exe
+          Start-Sleep -Seconds 2
+
+      - name: Set display resolution to 1080p
+        shell: pwsh
+        run: |
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+
+          public class Resolution {
+              [DllImport("user32.dll")]
+              public static extern int EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+
+              [DllImport("user32.dll")]
+              public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
+
+              [StructLayout(LayoutKind.Sequential)]
+              public struct DEVMODE {
+                  [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+                  public string dmDeviceName;
+                  public short dmSpecVersion;
+                  public short dmDriverVersion;
+                  public short dmSize;
+                  public short dmDriverExtra;
+                  public int dmFields;
+                  public int dmPositionX;
+                  public int dmPositionY;
+                  public int dmDisplayOrientation;
+                  public int dmDisplayFixedOutput;
+                  public short dmColor;
+                  public short dmDuplex;
+                  public short dmYResolution;
+                  public short dmTTOption;
+                  public short dmCollate;
+                  [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+                  public string dmFormName;
+                  public short dmLogPixels;
+                  public int dmBitsPerPel;
+                  public int dmPelsWidth;
+                  public int dmPelsHeight;
+                  public int dmDisplayFlags;
+                  public int dmDisplayFrequency;
+                  public int dmICMMethod;
+                  public int dmICMIntent;
+                  public int dmMediaType;
+                  public int dmDitherType;
+                  public int dmReserved1;
+                  public int dmReserved2;
+                  public int dmPanningWidth;
+                  public int dmPanningHeight;
+              }
+
+              public static int SetResolution(int width, int height) {
+                  DEVMODE dm = new DEVMODE();
+                  dm.dmDeviceName = new string(new char[32]);
+                  dm.dmFormName = new string(new char[32]);
+                  dm.dmSize = (short)Marshal.SizeOf(dm);
+
+                  if (EnumDisplaySettings(null, -1, ref dm) != 0) {
+                      dm.dmPelsWidth = width;
+                      dm.dmPelsHeight = height;
+                      return ChangeDisplaySettings(ref dm, 0);
+                  }
+                  return -1;
+              }
+          }
+          '@
+          $result = [Resolution]::SetResolution(1920, 1080)
+          Write-Host "ChangeDisplaySettings result: $result (0 = success)"
+          Start-Sleep -Seconds 2
+          Get-CimInstance -ClassName Win32_VideoController | Select-Object CurrentHorizontalResolution, CurrentVerticalResolution
 
       - name: Install dependencies
         run: |
