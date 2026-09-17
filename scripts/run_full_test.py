@@ -11,7 +11,29 @@ MAIN_REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "gta-sa-def
 sys.path.insert(0, MAIN_REPO_DIR)
 os.chdir(MAIN_REPO_DIR)
 
-PLAY_WAIT_SECONDS = int(os.environ.get("PLAY_WAIT_SECONDS", "45"))
+
+def get_video_duration_seconds():
+    # read the actual intro video's length so PLAY_WAIT_SECONDS can never
+    # be shorter than the video itself -- a hardcoded guess here is what
+    # caused the window to force-close mid-video before the roast ever
+    # got a chance to show
+    import cv2
+    from resources import VIDEO_PATH
+
+    cap = cv2.VideoCapture(VIDEO_PATH)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
+    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+    cap.release()
+    return frame_count / fps if fps else 0
+
+
+ROAST_BUFFER_SECONDS = 20  # how long to actually sit on the roast screen before closing
+
+_env_value = os.environ.get("PLAY_WAIT_SECONDS")
+if _env_value is not None:
+    PLAY_WAIT_SECONDS = int(_env_value)
+else:
+    PLAY_WAIT_SECONDS = int(get_video_duration_seconds()) + ROAST_BUFFER_SECONDS
 
 # hard ceiling on the whole script - wizard phase + play phase combined.
 # if anything gets stuck for any reason (COM error, unfocused window
@@ -57,9 +79,17 @@ def run_wizard_phase():
 
     def step_progress():
         app.frames["ComponentsPage"].go_next()
-        # progress page finishes and flips to FinishPage on its own,
-        # just give it a bit of headroom
-        app.after(5000, step_finish)
+        # the progress bar's own animation speed can change (it did --
+        # we slowed it down for realism) so instead of guessing a fixed
+        # wait here, poll until it actually reports 100% before moving on
+        wait_for_progress_done()
+
+    def wait_for_progress_done():
+        progress_page = app.frames["ProgressPage"]
+        if getattr(progress_page, "pct", 0) >= 100:
+            app.after(800, step_finish)
+        else:
+            app.after(300, wait_for_progress_done)
 
     def step_finish():
         try:
@@ -77,6 +107,8 @@ def run_wizard_phase():
 
 def run_play_phase():
     import tkinter
+
+    print(f"Play phase: waiting up to {PLAY_WAIT_SECONDS}s for video + roast", flush=True)
 
     # instead of trying to simulate a real OS-level ESC keypress (which
     # needs the window to actually have OS focus - unreliable on a CI
