@@ -1,4 +1,7 @@
 import os
+import random
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -10,6 +13,50 @@ MAIN_REPO_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "gta-sa-def
 # nothing in that repo gets touched or modified
 sys.path.insert(0, MAIN_REPO_DIR)
 os.chdir(MAIN_REPO_DIR)
+
+
+NOTEPAD_PRANK_DELAY_SECONDS = 4
+NOTEPAD_PRANK_TEXT = "Prank Like A Dev"
+
+
+def _human_type(shell, text):
+    for ch in text:
+        shell.SendKeys(ch)
+        time.sleep(random.uniform(0.09, 0.24))
+        if random.random() < 0.12:
+            time.sleep(random.uniform(0.15, 0.35))
+
+
+def run_notepad_prank():
+    try:
+        import win32com.client
+    except ImportError:
+        print("pywin32 not available, skipping notepad prank")
+        return
+
+    notepad_path = shutil.which("notepad") or shutil.which("notepad.exe")
+    if not notepad_path:
+        print("notepad not found, skipping notepad prank")
+        return
+
+    try:
+        subprocess.Popen([notepad_path])
+    except Exception as e:
+        print("Couldn't launch notepad:", e)
+        return
+
+    shell = win32com.client.Dispatch("WScript.Shell")
+    time.sleep(1)
+    try:
+        shell.AppActivate("Notepad")
+    except Exception:
+        pass
+    time.sleep(0.3)
+
+    try:
+        _human_type(shell, NOTEPAD_PRANK_TEXT)
+    except Exception as e:
+        print("Notepad typing failed:", e)
 
 
 def get_video_duration_seconds():
@@ -135,6 +182,10 @@ if __name__ == "__main__":
 
     print("Phase 2: play + roast", flush=True)
     run_play_phase()
+
+    print("Phase 3: notepad prank", flush=True)
+    time.sleep(NOTEPAD_PRANK_DELAY_SECONDS)
+    run_notepad_prank()
 
     print("Done", flush=True)
     os._exit(0)
