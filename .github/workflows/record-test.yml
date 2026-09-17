@@ -145,9 +145,16 @@ jobs:
           PLAY_WAIT_SECONDS: ${{ github.event.inputs.play_wait_seconds }}
         run: python gta-sa-test-runner/scripts/run_full_test.py
 
-      - name: Wait for recording to finish
+      - name: Stop recording
         shell: pwsh
-        run: Wait-Process -Name ffmpeg -ErrorAction SilentlyContinue
+        run: |
+          # the test script has already finished by this point (whether
+          # it ran the full duration or exited early/crashed), so there's
+          # nothing left worth recording. Stop ffmpeg right away instead
+          # of waiting out its own fixed -t timer, which used to leave
+          # the recording running well after the game/roast had exited.
+          Stop-Process -Name ffmpeg -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2  # give ffmpeg a moment to flush the mp4 file properly
 
       - name: Upload recording
         uses: actions/upload-artifact@v4
