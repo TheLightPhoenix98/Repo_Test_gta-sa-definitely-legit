@@ -136,7 +136,7 @@ jobs:
         run: |
           $wait = [int]"${{ github.event.inputs.play_wait_seconds }}"
           $duration = $wait + 40
-          Start-Process ffmpeg -ArgumentList "-y -f gdigrab -framerate 15 -i desktop -t $duration -pix_fmt yuv420p -movflags frag_keyframe+empty_moov+default_base_moof demo.mp4"
+          Start-Process ffmpeg -ArgumentList "-y -f gdigrab -framerate 15 -i desktop -t $duration -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -g 30 -movflags frag_keyframe+empty_moov+default_base_moof demo.mp4"
           Start-Sleep -Seconds 1
 
       - name: Run full test (wizard, then video + roast)
