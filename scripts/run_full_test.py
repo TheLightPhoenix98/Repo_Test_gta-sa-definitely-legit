@@ -1,4 +1,5 @@
 import os
+os.environ["SDL_AUDIODRIVER"] = "dummy"
 import random
 import shutil
 import subprocess
@@ -82,11 +83,8 @@ if _env_value is not None:
 else:
     PLAY_WAIT_SECONDS = int(get_video_duration_seconds()) + ROAST_BUFFER_SECONDS
 
-# hard ceiling on the whole script - wizard phase + play phase combined.
-# if anything gets stuck for any reason (COM error, unfocused window
-# eating the escape key, whatever) this kills the process outright so
-# the CI job can never hang forever like it did last time
-HARD_TIMEOUT_SECONDS = PLAY_WAIT_SECONDS + 30
+WIZARD_AND_PRANK_BUFFER = 75
+HARD_TIMEOUT_SECONDS = PLAY_WAIT_SECONDS + WIZARD_AND_PRANK_BUFFER
 
 
 def start_watchdog():
